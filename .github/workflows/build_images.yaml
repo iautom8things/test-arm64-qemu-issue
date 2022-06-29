@@ -1,0 +1,90 @@
+---
+name: Build Images
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    # These defaults are the defaults for adhoc workflow dispatches ONLY.
+    # Automatic build defaults are specified in the job definition, below
+    inputs:
+      elixir_versions:
+        description: "Stringified JSON array listing target Elixir versions"
+        default: '["1.13.4"]'
+        required: false
+        type: string
+      erlang_versions:
+        description: "Stringified JSON array listing target Erlang versions"
+        default: '["25.0.2"]'
+        required: false
+        type: string
+      alpine_versions:
+        description: "Stringified JSON array listing target Alpine versions"
+        default: '["3.14.3","3.15.0"]'
+        required: false
+        type: string
+
+jobs:
+  build_on-demand:
+    name: Build Image (On-Demand)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        elixir: ${{ fromJson(github.event.inputs.elixir_versions) }}
+        erlang: ${{ fromJson(github.event.inputs.erlang_versions) }}
+        alpine: ${{ fromJson(github.event.inputs.alpine_versions) }}
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up QEMU
+        id: qemu
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Build
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          file: ./Dockerfile
+          tags: iautom8things/phx-base:${{ matrix.elixir }}-erlang-${{ matrix.erlang }}-alpine-${{ matrix.alpine }}
+          build-args: |
+            ELIXIR_VERSION=${{ matrix.elixir }}
+            ERLANG_VERSION=${{ matrix.erlang }}
+            ALPINE_VERSION=${{ matrix.alpine }}
+
+  build_automated:
+    name: Build Image (Automated)
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        elixir: ["1.13.4"]
+        erlang: ["24.3"]
+        alpine: ["3.14.3"]
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up QEMU
+        id: qemu
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Build
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          file: ./Dockerfile
+          tags: iautom8things/phx-base:${{ matrix.elixir }}-erlang-${{ matrix.erlang }}-alpine-${{ matrix.alpine }}
+          build-args: |
+            ELIXIR_VERSION=${{ matrix.elixir }}
+            ERLANG_VERSION=${{ matrix.erlang }}
+            ALPINE_VERSION=${{ matrix.alpine }}
